@@ -65,16 +65,36 @@ def run_sqlmap(target, dump=False, proxy=None, timeout=300, level=2, risk=1, cus
         print(f"[!] Error running SQLMap: {str(e)}")
         return False, f"[!] Error running SQLMap: {str(e)}"
 
+# Function to run Gobuster to discover hidden directories and files
+def run_gobuster(target, wordlist, timeout=300):
+    print(f"[*] Running Gobuster scan on {target}...")
+    try:
+        gobuster_cmd = ["gobuster", "dir", "-u", target, "-w", wordlist, "-q", "-t", "20"]
+        gobuster_result = subprocess.run(gobuster_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+        result_str = gobuster_result.stdout.decode('utf-8')
+
+        # Log the result
+        log_results(f"{target}_gobuster_results.txt", result_str)
+
+        print("[+] Gobuster scan completed.")
+        return result_str
+    except subprocess.TimeoutExpired:
+        print("[!] Gobuster scan timed out.")
+        return "[!] Gobuster scan timed out."
+    except Exception as e:
+        print(f"[!] Error running Gobuster: {str(e)}")
+        return f"[!] Error running Gobuster: {str(e)}"
+
 # Function to log results into a file
 def log_results(filename, data):
     with open(filename, 'a') as log_file:
         log_file.write(data + '\n')
 
 # Function to display results in a formatted table
-def display_results(target, nmap_results, sqlmap_results, dump=False):
+def display_results(target, nmap_results, sqlmap_results, gobuster_results, dump=False):
     table = PrettyTable()
-    table.field_names = ["Target", "Nmap Result", "SQLMap Vulnerability", "SQL Dump Status"]
-    table.add_row([target, "Web Server Detected" if nmap_results else "No Web Server", "Vulnerable" if sqlmap_results else "Not Vulnerable", "Success" if dump else "No Dump"])
+    table.field_names = ["Target", "Nmap Result", "SQLMap Vulnerability", "Gobuster Results", "SQL Dump Status"]
+    table.add_row([target, "Web Server Detected" if nmap_results else "No Web Server", "Vulnerable" if sqlmap_results else "Not Vulnerable", "Results Found" if gobuster_results else "No Results", "Success" if dump else "No Dump"])
     print(table)
 
 # Function to send email notifications
@@ -89,18 +109,25 @@ def send_email_notification(to_email, scan_result):
     s.quit()
 
 # Main scanning function for each target
-def scan_target(target, ports="80,443", proxy=None, dump=False, level=2, risk=1, nmap_args="", sqlmap_args="", email=None):
+def scan_target(target, ports="80,443", proxy=None, dump=False, level=2, risk=1, nmap_args="", sqlmap_args="", email=None, wordlist=None):
     # Run Nmap scan
     web_detected, nmap_result = run_nmap(target, ports=ports, custom_args=nmap_args)
 
     # Run SQLMap if a web server is detected
     if web_detected:
         vulnerable, sqlmap_result = run_sqlmap(target, dump=dump, proxy=proxy, level=level, risk=risk, custom_args=sqlmap_args)
-        display_results(target, web_detected, vulnerable, dump)
+
+        # Run Gobuster if a web server is detected and a wordlist is provided
+        gobuster_result = ""
+        if wordlist:
+            gobuster_result = run_gobuster(target, wordlist)
+
+        display_results(target, web_detected, vulnerable, gobuster_result, dump)
+        
         if email:
-            send_email_notification(email, f"Scan completed for {target}.\n\nNmap Results:\n{nmap_result}\n\nSQLMap Results:\n{sqlmap_result}")
+            send_email_notification(email, f"Scan completed for {target}.\n\nNmap Results:\n{nmap_result}\n\nSQLMap Results:\n{sqlmap_result}\n\nGobuster Results:\n{gobuster_result}")
     else:
-        print(f"[!] Skipping SQLMap for {target}, no web server detected.")
+        print(f"[!] Skipping SQLMap and Gobuster for {target}, no web server detected.")
 
 # Main function to handle multiple targets and user inputs
 def main():
@@ -108,6 +135,7 @@ def main():
     ports = input("Enter ports to scan (default 80,443): ") or "80,443"
     proxy = input("Enter proxy (leave blank for no proxy): ")
     email = input("Enter email for notifications (leave blank for no email): ")
+    wordlist = input("Enter path to Gobuster wordlist (leave blank to skip Gobuster): ")
     dump_choice = input("Attempt SQL dump if vulnerable? (y/n): ").lower() == 'y'
     level = input("SQLMap scan level (default 2): ") or "2"
     risk = input("SQLMap risk level (default 1): ") or "1"
@@ -116,7 +144,7 @@ def main():
 
     # Run scans in parallel
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(scan_target, target.strip(), ports, proxy, dump_choice, int(level), int(risk), nmap_args, sqlmap_args, email) for target in targets]
+        futures = [executor.submit(scan_target, target.strip(), ports, proxy, dump_choice, int(level), int(risk), nmap_args, sqlmap_args, email, wordlist) for target in targets]
         concurrent.futures.wait(futures)
 
 if __name__ == "__main__":
