@@ -1,11 +1,12 @@
 # Automated-SQL-Injection
-This is an Automated SQL Injection and Datadump python script that uses "nmap" and "sqlmap." 
+This is an Automated SQL Injection and Datadump python script that uses "nmap," "sqlmap," and "Gobuster."
 
 # Prerequisites:
-- Nmap installed (sudo apt-get install nmap)
-- SQLMap installed (sudo apt-get install sqlmap or download from SQLMap)
-- Python installed (>= 3.x)
+- Nmap installed: (sudo apt-get install nmap)
+- SQLMap installed: (sudo apt-get install sqlmap or download from SQLMap)
+- Python installed: (>= 3.x)
 - pip install prettytable
+- Gobuster installed: sudo apt-get install gobuster
 
 # Breakdown of Features and Enhancements:
 - Custom Port Scanning: You can specify custom ports to scan with Nmap.
@@ -17,6 +18,7 @@ This is an Automated SQL Injection and Datadump python script that uses "nmap" a
 - Formatted Output: Results are displayed in a pretty table using the prettytable library.
 - Email Notifications: The script sends email notifications when scans are completed, useful for long-running operations.
 - Error Handling: Proper error handling and timeouts are in place to ensure the script doesn’t hang or crash.
+- Added Gobuster: Gobuster is useful for discovering hidden directories and files on a web server, which could expose additional attack surfaces.
 
 #Was this script helpful? Please donate!
 
